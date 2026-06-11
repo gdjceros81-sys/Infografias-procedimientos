@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visor de Documentos</title>
+    <title>Visor Automático de Documentos</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -14,7 +14,6 @@
             height: 100vh;
             box-sizing: border-box;
             background-color: #f8f9fa;
-            color: #212529;
         }
 
         header {
@@ -22,13 +21,8 @@
             margin-bottom: 10px;
         }
 
-        h2 {
-            margin: 5px 0;
-            font-size: 20px;
-            color: #007bff;
-        }
+        h2 { margin: 5px 0; font-size: 20px; color: #007bff; }
 
-        /* Contenedor dinámico de botones */
         .menu {
             display: flex;
             justify-content: center;
@@ -52,7 +46,6 @@
             transition: all 0.2s ease;
         }
 
-        /* Estilo para el documento seleccionado */
         button.active {
             background-color: #007bff;
             color: white;
@@ -67,6 +60,11 @@
             background-color: #fff;
             overflow: hidden;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #666;
         }
 
         iframe {
@@ -82,57 +80,77 @@
         <h2>Documentos Disponibles</h2>
     </header>
 
-    <div class="menu" id="menu-documentos"></div>
+    <div class="menu" id="menu-documentos">
+        <p style="font-size: 14px;">Buscando documentos en el servidor...</p>
+    </div>
 
-    <div id="pdf-container">
-        </div>
+    <div id="pdf-container"></div>
 
     <script>
-        // CONFIGURACIÓN DE ARCHIVOS
-        // Cada vez que agregues un PDF, solo debes sumarlo a esta lista respetando el formato.
-        const misDocumentos = [
-            { nombre: "Manual de Operación", archivo: "manual_operacion.pdf" },
-            { nombre: "Especificaciones Técnicas", archivo: "especificaciones.pdf" },
-            { nombre: "Plan de Trabajo 2026", archivo: "plan_2026.pdf" }
-        ];
+        // --- CONFIGURACIÓN OBLIGATORIA ---
+        // Coloca aquí tu usuario y el nombre exacto de tu repositorio en GitHub
+        const githubUser = "TU_USUARIO"; 
+        const githubRepo = "TU_REPOSITORIO"; 
+        // ---------------------------------
 
+        const apiUrl = `https://api.github.com/repos/${githubUser}/${githubRepo}/contents/`;
         const menuContenedor = document.getElementById('menu-documentos');
         const pdfContenedor = document.getElementById('pdf-container');
 
-        function inicializarAplicacion() {
-            if (misDocumentos.length === 0) {
-                pdfContenedor.innerHTML = "<p style='text-align:center; padding:20px;'>No hay documentos disponibles.</p>";
-                return;
-            }
-
-            misDocumentos.forEach((doc, index) => {
-                const boton = document.createElement('button');
-                boton.textContent = doc.nombre; // Muestra el nombre asignado
-                boton.onclick = () => desplegarPDF(doc.archivo, boton);
-                menuContenedor.appendChild(boton);
-
-                // Muestra el primer documento de la lista de forma automática al abrir la web
-                if (index === 0) {
-                    desplegarPDF(doc.archivo, boton);
+        async function cargarDocumentos() {
+            try {
+                // Consultamos la API de GitHub para obtener los archivos
+                const respuesta = await fetch(apiUrl);
+                
+                if (!respuesta.ok) {
+                    throw new Error("No se pudo conectar. Verifica que el usuario y repo sean correctos y el repositorio sea público.");
                 }
-            });
+                
+                const archivos = await respuesta.json();
+                
+                // Filtramos solo los archivos que terminan en .pdf
+                const pdfs = archivos.filter(archivo => archivo.name.toLowerCase().endsWith('.pdf'));
+
+                // Limpiamos el mensaje de "buscando"
+                menuContenedor.innerHTML = '';
+
+                if (pdfs.length === 0) {
+                    menuContenedor.innerHTML = "<p>No hay documentos PDF disponibles.</p>";
+                    return;
+                }
+
+                // Creamos un botón por cada PDF encontrado
+                pdfs.forEach((pdf, index) => {
+                    const boton = document.createElement('button');
+                    
+                    // Usamos el nombre exacto del archivo, pero le quitamos el ".pdf" para que el botón se vea más limpio
+                    let nombreLimpio = pdf.name.replace('.pdf', '').replace(/-/g, ' ').replace(/_/g, ' ');
+                    boton.textContent = nombreLimpio; 
+                    
+                    boton.onclick = () => desplegarPDF(pdf.name, boton);
+                    menuContenedor.appendChild(boton);
+
+                    // Desplegamos el primer PDF automáticamente
+                    if (index === 0) {
+                        desplegarPDF(pdf.name, boton);
+                    }
+                });
+
+            } catch (error) {
+                menuContenedor.innerHTML = `<p style="color:red; font-size:14px;">Error al cargar la lista: ${error.message}</p>`;
+                console.error(error);
+            }
         }
 
-        function desplegarPDF(rutaArchivo, botonPresionado) {
-            // Remueve el estado activo de cualquier otro botón
+        function desplegarPDF(nombreArchivo, botonPresionado) {
             const botones = menuContenedor.querySelectorAll('button');
             botones.forEach(b => b.classList.remove('active'));
-
-            // Activa el botón actual
             botonPresionado.classList.add('active');
-
-            // Actualiza el visor con el archivo correspondiente
-            // '#toolbar=0' oculta las herramientas nativas para aprovechar el espacio en celulares
-            pdfContenedor.innerHTML = `<iframe src="${rutaArchivo}#toolbar=0" title="Visor PDF"></iframe>`;
+            pdfContenedor.innerHTML = `<iframe src="${nombreArchivo}#toolbar=0" title="Visor PDF"></iframe>`;
         }
 
-        // Ejecuta la carga del menú al iniciar la página
-        inicializarAplicacion();
+        // Iniciamos el proceso al cargar la página
+        cargarDocumentos();
     </script>
 
 </body>
